@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Batcave Office — Grok Bots</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #07070f; color: #eee; font-family: system-ui, -apple-system, sans-serif; }
+#controls { position: sticky; top: 0; z-index: 100; display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; background: #111; padding: 8px; border-bottom: 1px solid #333; }
+#controls button { background: #222; color: #ccc; border: 1px solid #444; padding: 8px 12px; border-radius: 8px; font-size: 13px; }
+#controls button.active { background: #4a2a6a; color: #fff; border-color: #6a3aaa; }
+.floor { margin: 10px; padding: 12px; border-radius: 10px; border: 1px solid #333; min-height: 180px; position: relative; }
+.floor h2 { font-size: 16px; margin-bottom: 10px; }
+.club { background: #140a22; }
+.litigation { background: #12180a; }
+.trading { background: #0a1618; }
+.ground { background: #151515; }
+.bot { display: inline-block; margin: 6px; padding: 6px 10px; background: #222; border-radius: 20px; font-size: 12px; }
+.bot.working { background: #1a3a6a; color: #8af; }
+.bot.idle { background: #2a2a2a; color: #aaa; }
+.zone { display: inline-block; margin: 8px; padding: 20px 16px; background: rgba(255,255,255,0.05); border: 1px dashed #444; border-radius: 8px; font-size: 12px; color: #888; }
+.todo { margin-top: 10px; font-size: 12px; }
+.todo div { margin: 3px 0; }
+.working-text { color: #6f8; }
+.idle-text { color: #999; }
+.hidden { display: none; }
+</style>
+</head>
+<body>
+<div id="controls">
+  <button class="active" onclick="filter('all')">All Floors</button>
+  <button onclick="filter('club,litigation')">Club + Litigation</button>
+  <button onclick="filter('club,trading')">Club + Trading</button>
+  <button onclick="filter('litigation,trading')">Litigation + Trading</button>
+  <button onclick="filter('club')">Club House</button>
+  <button onclick="filter('litigation')">Litigation Lab</button>
+  <button onclick="filter('trading')">Trading Floor</button>
+  <button onclick="filter('ground')">Ground Floor</button>
+</div>
+
+<div id="club" class="floor club">
+  <h2>Club House</h2>
+  <div class="zone">ONE-WAY GLASS CABIN</div>
+  <div class="zone">BAR</div>
+  <div class="zone">POOL</div>
+  <div class="zone">RACING</div>
+  <div id="club-bots"></div>
+</div>
+
+<div id="litigation" class="floor litigation">
+  <h2>Litigation Lab — Shared To-Do</h2>
+  <div id="lit-todo" class="todo"></div>
+  <div id="lit-bots"></div>
+</div>
+
+<div id="trading" class="floor trading">
+  <h2>Trading Floor — Shared To-Do</h2>
+  <div id="trade-todo" class="todo"></div>
+  <div id="trade-bots"></div>
+</div>
+
+<div id="ground" class="floor ground">
+  <h2>Ground Floor</h2>
+  <div id="ground-bots"></div>
+</div>
+
+<script>
+const agents = [
+  { name: 'Strict Legal Reviewer', group: 'litigation', status: 'idle', task: 'Reviewing summaries' },
+  { name: 'Legal Judgment Framework', group: 'litigation', status: 'idle', task: 'Building framework' },
+  { name: 'Litigation Lab Lead', group: 'litigation', status: 'working', task: 'Coordinating lab' },
+  { name: 'Legal Quant Analytics', group: 'litigation', status: 'working', task: 'Quant research' },
+  { name: 'Litigation Data Engineer', group: 'litigation', status: 'idle', task: 'Data pipelines' },
+  { name: 'Trading Chief of Staff', group: 'trading', status: 'idle', task: 'Desk coordination' },
+  { name: 'Market Scout', group: 'trading', status: 'idle', task: 'Scanning markets' },
+  { name: 'Strategy Researcher', group: 'trading', status: 'idle', task: 'Backtesting plans' },
+  { name: 'Risk Officer', group: 'trading', status: 'idle', task: 'Risk checks' },
+  { name: 'Quant Math Expert', group: 'trading', status: 'idle', task: 'Quant analysis' },
+  { name: 'Usage Saver', group: 'ground', status: 'idle', task: null },
+  { name: 'Unassigned', group: 'ground', status: 'idle', task: null }
+];
+
+function render() {
+  const clubBots = document.getElementById('club-bots');
+  const litBots = document.getElementById('lit-bots');
+  const tradeBots = document.getElementById('trade-bots');
+  const groundBots = document.getElementById('ground-bots');
+  const litTodo = document.getElementById('lit-todo');
+  const tradeTodo = document.getElementById('trade-todo');
+  clubBots.innerHTML = litBots.innerHTML = tradeBots.innerHTML = groundBots.innerHTML = '';
+  litTodo.innerHTML = tradeTodo.innerHTML = '';
+
+  agents.forEach(a => {
+    const el = document.createElement('div');
+    el.className = 'bot ' + a.status;
+    el.textContent = a.name.split(' ')[0] + (a.status === 'working' ? ' ●' : ' ○');
+    if (a.status === 'idle' && a.group !== 'ground') {
+      clubBots.appendChild(el);
+    } else if (a.group === 'litigation') {
+      litBots.appendChild(el);
+    } else if (a.group === 'trading') {
+      tradeBots.appendChild(el);
+    } else {
+      groundBots.appendChild(el);
+    }
+
+    if (a.group === 'litigation') {
+      const t = document.createElement('div');
+      t.className = a.status === 'working' ? 'working-text' : 'idle-text';
+      t.textContent = a.status === 'working' ? `● ${a.name}: ${a.task}` : `○ ${a.name}: Idle (club)`;
+      litTodo.appendChild(t);
+    }
+    if (a.group === 'trading') {
+      const t = document.createElement('div');
+      t.className = a.status === 'working' ? 'working-text' : 'idle-text';
+      t.textContent = a.status === 'working' ? `● ${a.name}: ${a.task}` : `○ ${a.name}: Idle (club)`;
+      tradeTodo.appendChild(t);
+    }
+  });
+}
+
+function filter(floors) {
+  document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  const show = floors === 'all' ? ['club','litigation','trading','ground'] : floors.split(',');
+  ['club','litigation','trading','ground'].forEach(f => {
+    document.getElementById(f).classList.toggle('hidden', !show.includes(f));
+  });
+}
+
+render();
+</script>
+</body>
+</html>
